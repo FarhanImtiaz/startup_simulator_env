@@ -198,7 +198,34 @@ Use it as the running build sheet while the project is being implemented.
 - [ ] Prepare HuggingFace Spaces version
 - [ ] Prepare short explainer flow
 
-## 14. Demo and Pitch
+## 14. Automated Round Checks
+
+These are the items the validation pass looks for. If any is missing or broken at the deadline, the submission will not make it to a human judge, regardless of how strong the underlying idea is. Verify each one explicitly before submitting.
+
+- [ ] Public, cloneable Hugging Face Space at the submitted URL
+  - [ ] Test from a logged-out browser
+  - [ ] Confirm the Space is not private
+  - [ ] Confirm the submitted link is not dead or returning 404
+- [ ] Valid OpenEnv structure
+  - [ ] Proper `Environment` / `MCPEnvironment` base class
+  - [ ] Gym-style `reset`, `step`, and `state`
+  - [ ] Parseable `openenv.yaml`
+- [ ] Training evidence committed to the repo as image files
+  - [ ] Loss curve committed as `.png` or `.jpg`
+  - [ ] Reward curve committed as `.png` or `.jpg`
+  - [ ] Confirm plots are not only WandB links or Colab cell outputs
+- [ ] Runnable training script
+  - [ ] Unsloth, Hugging Face TRL, or another framework is acceptable
+  - [ ] Prefer a linked Colab notebook that can be re-executed end to end
+  - [ ] Python script is acceptable if the full training flow is runnable
+- [ ] README links every deliverable
+  - [ ] Hugging Face Space
+  - [ ] Training notebook or script
+  - [ ] Writeup, blog, video, or slides
+  - [ ] Key plots embedded inline
+  - [ ] Confirm every deliverable is reachable from the README
+
+## 15. Demo and Pitch
 
 - [ ] Show environment state evolving
 - [ ] Show co-founder proposals
@@ -214,7 +241,7 @@ Use it as the running build sheet while the project is being implemented.
   - [ ] reward
   - [ ] results
 
-## 15. Immediate Next Build Order
+## 16. Immediate Next Build Order
 
 - [x] Create multi-episode evaluation script
 - [x] Add saved logs and aggregate metrics
@@ -223,7 +250,7 @@ Use it as the running build sheet while the project is being implemented.
 - [x] Add LLM prompt-based agent interface
 - [x] Add training pipeline scaffold
 
-## 16. Files To Touch Next
+## 17. Files To Touch Next
 
 - `environment.py`
   - continue reward and dynamics tuning
@@ -246,7 +273,7 @@ Use it as the running build sheet while the project is being implemented.
 - `train.py`
   - trajectory collection scaffold for future training
 
-## 17. Current Snapshot
+## 18. Current Snapshot
 
 - Environment core: strong prototype
 - Advanced uncertainty features: implemented first pass
