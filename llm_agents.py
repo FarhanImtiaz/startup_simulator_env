@@ -44,6 +44,16 @@ class PromptedAgentMixin:
         action = parse_action(raw_response, self.allowed_actions)
         if action is None:
             return fallback
+        if (
+            (observation.get("crisis_level") == "crisis" or observation.get("runway_hint", 999) < 2)
+            and action in StartupEnvironment.CRISIS_DISALLOWED_ACTIONS
+        ):
+            if fallback.action not in StartupEnvironment.CRISIS_DISALLOWED_ACTIONS:
+                return fallback
+            return ActionProposal(
+                action="do_nothing",
+                reasoning=f"Prompt safety fallback: {action} is disallowed in crisis.",
+            )
 
         return ActionProposal(action=action, reasoning=f"LLM-selected action from prompt scaffold: {action}")
 
@@ -67,8 +77,10 @@ class PromptedTechCoFounder(PromptedAgentMixin):
     def build_prompt(self, observation: Dict[str, object], fallback: ActionProposal) -> PromptArtifacts:
         return PromptArtifacts(
             system_prompt=(
-                "You are the Tech Co-founder of a startup. "
-                "Prioritize product quality, stability, and long-term retention."
+                "You are the Tech Co-founder of a startup operating under uncertainty. "
+                "Use recent trends, the last three growth signals, runway hints, recent actions, and recent events to infer hidden conditions. "
+                "Prioritize product quality, stability, and long-term retention, and avoid mindlessly repeating the same action unless the evidence is still strong. "
+                "If the company is in crisis, prefer decisive recovery moves over passive waiting."
             ),
             user_prompt=_format_role_prompt(observation, self.allowed_actions, fallback.action),
         )
@@ -86,8 +98,10 @@ class PromptedGrowthCoFounder(PromptedAgentMixin):
     def build_prompt(self, observation: Dict[str, object], fallback: ActionProposal) -> PromptArtifacts:
         return PromptArtifacts(
             system_prompt=(
-                "You are the Growth Co-founder of a startup. "
-                "Prioritize user growth, market capture, and momentum."
+                "You are the Growth Co-founder of a startup operating under uncertainty. "
+                "Use recent trends, the last three growth signals, runway hints, recent actions, and recent events to infer hidden conditions. "
+                "Prioritize user growth, market capture, and momentum, and avoid repeating stale growth plays when recent evidence weakens. "
+                "If the company is in crisis, prefer decisive recovery moves over passive waiting."
             ),
             user_prompt=_format_role_prompt(observation, self.allowed_actions, fallback.action),
         )
@@ -105,8 +119,10 @@ class PromptedFinanceCoFounder(PromptedAgentMixin):
     def build_prompt(self, observation: Dict[str, object], fallback: ActionProposal) -> PromptArtifacts:
         return PromptArtifacts(
             system_prompt=(
-                "You are the Finance Co-founder of a startup. "
-                "Prioritize cash preservation, runway, and operational sustainability."
+                "You are the Finance Co-founder of a startup operating under uncertainty. "
+                "Use recent trends, the last three growth signals, runway hints, recent actions, and recent events to infer hidden conditions. "
+                "Prioritize cash preservation, runway, and operational sustainability, but avoid getting stuck in repetitive cost-cutting when the business may need recovery. "
+                "If the company is in crisis, prefer decisive survival-and-recovery moves over passive waiting."
             ),
             user_prompt=_format_role_prompt(observation, self.allowed_actions, fallback.action),
         )
@@ -139,6 +155,14 @@ class PromptedCEO:
         action = parse_action(raw_response, self.allowed_actions)
         if action is None:
             return fallback
+        if (
+            (observation.get("crisis_level") == "crisis" or observation.get("runway_hint", 999) < 2)
+            and action in StartupEnvironment.CRISIS_DISALLOWED_ACTIONS
+        ):
+            return ActionProposal(
+                action="fire_employee",
+                reasoning=f"LLM safety override: {action} is disallowed in crisis, so selected fire_employee.",
+            )
         return ActionProposal(action=action, reasoning=f"LLM-selected final decision: {action}")
 
     def build_prompt(
@@ -157,12 +181,20 @@ class PromptedCEO:
             f"{chr(10).join(proposal_lines)}\n\n"
             f"Allowed actions: {', '.join(self.allowed_actions)}\n"
             f"Fallback action if uncertain: {fallback.action}\n"
+            "CEO runway policy:\n"
+            "- Runway below 2: choose fire_employee, then do_nothing, then pivot_strategy; never choose run_marketing_campaign or hire_employee.\n"
+            "- Runway 2 to 3: do not hire; strongly consider fire_employee; pivot only if growth is strongly negative.\n"
+            "- Runway 3 to 6: do not hire; use run_marketing_campaign only if trend is improving.\n"
+            "- Runway above 6: balance product and growth; hire only if all last 3 growth values are positive and recent_events does not include viral_growth.\n"
+            "- Treat viral_growth as temporary and avoid increasing fixed costs immediately after it.\n"
             "Respond with exactly one line in the form: Action: <action_name>"
         )
         return PromptArtifacts(
             system_prompt=(
-                "You are the CEO of a startup. "
-                "Choose the single best action for long-term company success under uncertainty."
+                "You are the CEO of a startup operating under uncertainty. "
+                "Choose the single best action for long-term company success by weighing runway hints, growth trend, recent events, crisis status, and the risk of repeating an action loop. "
+                "If the company is in crisis, avoid passive waiting unless there is truly no viable alternative. "
+                "Use the co-founder proposals as inputs, not commands."
             ),
             user_prompt=user_prompt,
         )
@@ -201,6 +233,10 @@ def _format_role_prompt(observation: Dict[str, object], allowed_actions, fallbac
         f"{_format_observation(observation)}\n\n"
         f"Allowed actions: {', '.join(allowed_actions)}\n"
         f"Fallback action if uncertain: {fallback_action}\n"
+        "Reason silently about trend direction, uncertainty, and whether repeating the last action is justified.\n"
+        "If crisis mode is active, favor a decisive recovery action instead of do_nothing unless every active option is clearly worse.\n"
+        "If runway is below 2, do not choose run_marketing_campaign or hire_employee.\n"
+        "Do not hire unless runway is above 6, all last 3 growth values are positive, and recent_events does not include viral_growth.\n"
         "Respond with exactly one line in the form: Action: <action_name>"
     )
 
@@ -215,8 +251,15 @@ def _format_observation(observation: Dict[str, object]) -> str:
         f"- Team Size: {observation['team_size']}\n"
         f"- Burn Rate: {observation['burn_rate']}\n"
         f"- Recent User Growth Signal: {observation['recent_user_growth']}\n"
+        f"- Last 3 Growth Signals: {observation['last_3_growth']}\n"
+        f"- Trend Direction: {observation['trend_direction']}\n"
         f"- Ad Performance: {observation['ad_performance']}\n"
         f"- Runway Hint: {observation['runway_hint']}\n"
+        f"- Crisis Mode: {observation['is_crisis']}\n"
+        f"- Crisis Level: {observation['crisis_level']}\n"
+        f"- Crisis Reason: {observation['crisis_reason']}\n"
         f"- Recent Events: {observation['recent_events']}\n"
-        f"- Recent Actions: {observation['recent_actions']}"
+        f"- Recent Actions: {observation['recent_actions']}\n"
+        f"- Last Action: {observation['last_action']}\n"
+        f"- Consecutive Action Streak: {observation['consecutive_action_streak']}"
     )

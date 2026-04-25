@@ -2,7 +2,7 @@ import argparse
 import json
 from pathlib import Path
 
-from agents import build_heuristic_agents
+from agents import ActionProposal, build_heuristic_agents
 from environment import StartupEnvironment
 from llm_agents import build_prompted_agents
 
@@ -28,6 +28,16 @@ def run_episode(
         }
 
         selected = ceo.choose_action(proposals, observation)
+        if (
+            (observation.get("crisis_level") == "crisis" or observation.get("runway_hint", 999) < 2)
+            and selected.action in StartupEnvironment.CRISIS_DISALLOWED_ACTIONS
+        ):
+            selected = ActionProposal(
+                action="fire_employee",
+                reasoning=(
+                    f"Safety override: {selected.action} is disallowed in crisis, so the CEO selected fire_employee."
+                ),
+            )
         result = env.step(selected.action, proposals=proposals)
         total_reward += result["reward"]
 
@@ -44,7 +54,10 @@ def run_episode(
             "chosen_action": selected.action,
             "chosen_reasoning": selected.reasoning,
             "reward": result["reward"],
+            "raw_reward": result.get("raw_reward"),
+            "reward_details": result.get("reward_details"),
             "event": result["event"],
+            "termination_reason": result.get("termination_reason"),
             "money": result["state"]["money"],
             "users": result["state"]["users"],
             "quality": result["state"]["product_quality"],
@@ -61,18 +74,29 @@ def run_episode(
             print(
                 "  obs:"
                 f" growth={observation['recent_user_growth']},"
+                f" last_3_growth={observation['last_3_growth']},"
+                f" trend={observation['trend_direction']},"
                 f" ad={observation['ad_performance']},"
                 f" runway_hint={observation['runway_hint']},"
+                f" crisis={observation['is_crisis']},"
+                f" crisis_level={observation['crisis_level']},"
+                f" last_action={observation['last_action']},"
+                f" streak={observation['consecutive_action_streak']},"
                 f" events={observation['recent_events']}"
             )
+            print(f"  crisis_reason={observation['crisis_reason']}")
+            print(f"  CEO reasoning: {selected.reasoning}")
             print(
                 "  result:"
                 f" reward={result['reward']},"
+                f" raw_reward={result.get('raw_reward')},"
                 f" event={result['event']},"
+                f" termination_reason={result.get('termination_reason')},"
                 f" money={result['state']['money']},"
                 f" users={result['state']['users']},"
                 f" quality={result['state']['product_quality']}"
             )
+            print(f"  reward_details={result.get('reward_details')}")
             print(f"  agent_rewards={result['agent_rewards']}")
             if show_hidden_state:
                 print(f"  debug_hidden={result['debug_state']['hidden_state']}")
@@ -86,6 +110,7 @@ def run_episode(
     summary = {
         "total_reward": round(total_reward, 3),
         "days_completed": len(episode_log),
+        "termination_reason": episode_log[-1]["termination_reason"] if episode_log else "not_started",
         "final_state": env.get_debug_state()["public_state"],
         "episode_log": episode_log,
     }
@@ -95,6 +120,7 @@ def run_episode(
             "Episode finished"
             f" day={summary['days_completed']},"
             f" total_reward={summary['total_reward']},"
+            f" termination_reason={summary['termination_reason']},"
             f" final_money={summary['final_state']['money']},"
             f" final_users={summary['final_state']['users']}"
         )
