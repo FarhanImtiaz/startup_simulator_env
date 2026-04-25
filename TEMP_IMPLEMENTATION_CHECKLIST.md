@@ -159,8 +159,8 @@ Use it as the running build sheet while the project is being implemented.
 - [x] Standardize observation output for training
 - [x] Standardize action output for training
 - [x] Standardize reward and done signals
-- [-] Expose trajectory collection hooks
-- [-] Ensure compatibility with TRL / Unsloth pipeline expectations
+- [x] Expose trajectory collection hooks
+- [x] Ensure compatibility with TRL / Unsloth pipeline expectations
 
 ## 10. LLM Agent Layer
 
@@ -179,31 +179,31 @@ Use it as the running build sheet while the project is being implemented.
 - [x] Create training script
 - [x] Run episodes to collect trajectories
 - [x] Store prompts, actions, outcomes, rewards
-- [ ] Optimize policy using rewards
-- [ ] Support repeated training cycles
+- [x] Optimize policy using rewards
+- [-] Support repeated training cycles
 - [x] Save trajectory outputs for future training
 - [x] Export SFT-style JSONL records
 - [x] Export preference-style JSONL records
-- [-] Document how to reproduce training
+- [x] Document how to reproduce training
 
 ## 12. Before vs After Comparison
 
 - [x] Run untrained or heuristic baseline
-- [ ] Run trained policy evaluation
-- [ ] Compare reward trends
-- [ ] Compare user growth
-- [ ] Compare profit / cash survival
-- [ ] Compare strategy quality qualitatively
-- [ ] Produce a simple graph or table for judges
+- [x] Run trained policy evaluation
+- [x] Compare reward trends
+- [x] Compare user growth
+- [x] Compare profit / cash survival
+- [-] Compare strategy quality qualitatively
+- [x] Produce a simple graph or table for judges
 
 ## 13. Hackathon Readiness
 
 - [x] README reflects the current state
 - [x] Clean `.gitignore`
 - [x] Remove temporary dev clutter from git status
-- [ ] Package the project cleanly
-- [ ] Add Colab notebook for training/demo
-- [ ] Prepare HuggingFace Spaces version
+- [-] Package the project cleanly
+- [-] Add Colab notebook for training/demo
+- [-] Prepare HuggingFace Spaces version
 - [ ] Prepare short explainer flow
 
 ## 14. Automated Round Checks
@@ -214,23 +214,23 @@ These are the items the validation pass looks for. If any is missing or broken a
   - [ ] Test from a logged-out browser
   - [ ] Confirm the Space is not private
   - [ ] Confirm the submitted link is not dead or returning 404
-- [ ] Valid OpenEnv structure
-  - [ ] Proper `Environment` / `MCPEnvironment` base class
-  - [ ] Gym-style `reset`, `step`, and `state`
-  - [ ] Parseable `openenv.yaml`
-- [ ] Training evidence committed to the repo as image files
-  - [ ] Loss curve committed as `.png` or `.jpg`
-  - [ ] Reward curve committed as `.png` or `.jpg`
-  - [ ] Confirm plots are not only WandB links or Colab cell outputs
-- [ ] Runnable training script
-  - [ ] Unsloth, Hugging Face TRL, or another framework is acceptable
+- [-] Valid OpenEnv structure
+  - [x] Proper `Environment` / `MCPEnvironment` base class
+  - [x] Gym-style `reset`, `step`, and `state`
+  - [x] Parseable `openenv.yaml`
+- [x] Training evidence committed to the repo as image files
+  - [x] Loss curve committed as `.png` or `.jpg`
+  - [x] Reward curve committed as `.png` or `.jpg`
+  - [x] Confirm plots are not only WandB links or Colab cell outputs
+- [-] Runnable training script
+  - [x] Unsloth, Hugging Face TRL, or another framework is acceptable
   - [ ] Prefer a linked Colab notebook that can be re-executed end to end
-  - [ ] Python script is acceptable if the full training flow is runnable
-- [ ] README links every deliverable
+  - [x] Python script is acceptable if the full training flow is runnable
+- [-] README links every deliverable
   - [ ] Hugging Face Space
   - [ ] Training notebook or script
   - [ ] Writeup, blog, video, or slides
-  - [ ] Key plots embedded inline
+  - [x] Key plots embedded inline
   - [ ] Confirm every deliverable is reachable from the README
 
 ## 15. Demo and Pitch
@@ -241,7 +241,7 @@ These are the items the validation pass looks for. If any is missing or broken a
 - [ ] Show random bad events
 - [ ] Show delayed effects
 - [ ] Show baseline failure cases
-- [ ] Show improved behavior after training
+- [x] Show improved behavior after training
 - [ ] Prepare concise explanation of
   - [ ] problem
   - [ ] environment
@@ -263,21 +263,25 @@ These are the items the validation pass looks for. If any is missing or broken a
 - [x] Phase 2: document evaluation artifacts in README
 - [x] Slim `agents.py` back to the maintainable heuristic baseline
 - [x] Add training-ready SFT and preference dataset exports
+- [x] Phase 3: add OpenEnv-style package and `openenv.yaml`
+- [x] Phase 3: add trained CEO mode, safety gate, and before/after metrics
+- [x] Phase 3: commit PNG loss and reward artifacts
+- [x] Phase 3: add Dockerfile and Colab notebook skeleton
 
 ## 17. Files To Touch Next
 
 - `evaluation.py`
-  - add before/after comparison mode once a trained or alternate policy exists
+  - optionally add a combined before/after comparison CLI
 - `agents.py`
   - continue survival and cash behavior tuning
 - `train.py`
-  - convert collected trajectories into an optimizer-ready dataset
+  - keep Colab commands synchronized with the final notebook
 - `README.md`
   - document new Phase 2 evaluation artifacts
 - `llm_agents.py`
-  - wire prompt scaffolding to a real model backend
-- `openenv_wrapper.py`
-  - tighten compatibility with a chosen training framework
+  - keep trained CEO backend documented and smoke-tested
+- `mass_startup_env/`
+  - validate against the latest OpenEnv CLI and HF Space runtime
 - `TEMP_IMPLEMENTATION_CHECKLIST.md`
   - update statuses as work progresses
 
@@ -287,6 +291,7 @@ These are the items the validation pass looks for. If any is missing or broken a
 - Advanced uncertainty features: implemented first pass
 - Multi-agent proposal flow: implemented
 - Evaluation pipeline: Phase 2 baseline reporting implemented
-- LLM integration: scaffolded without live model calls
-- Training: scaffolded only, optimization still deferred
-- Demo packaging: missing
+- LLM integration: trained CEO path implemented with safety gate
+- Training: TRL SFT script and Colab-tested CEO training complete
+- OpenEnv packaging: manifest and package scaffold added; needs final CLI/Space validation
+- Demo packaging: README and plots started; HF Space, Colab link, and video/blog still missing
