@@ -30,6 +30,7 @@ def collect_trajectories(
                 "agent_mode": agent_mode,
                 "total_reward": summary["total_reward"],
                 "days_completed": summary["days_completed"],
+                "termination_reason": summary["termination_reason"],
                 "final_state": summary["final_state"],
                 "steps": summary["episode_log"],
             }
@@ -55,9 +56,17 @@ def save_jsonl(path: str, records: List[Dict[str, object]]) -> None:
 def build_sft_records(
     trajectories: List[Dict[str, object]],
     min_step_reward: float | None = None,
+    survivors_only: bool = False,
+    min_final_money: float | None = None,
 ) -> List[Dict[str, object]]:
     records: List[Dict[str, object]] = []
     for trajectory in trajectories:
+        if not _trajectory_matches_filters(
+            trajectory,
+            survivors_only=survivors_only,
+            min_final_money=min_final_money,
+        ):
+            continue
         for step in trajectory["steps"]:
             if min_step_reward is not None and step["reward"] < min_step_reward:
                 continue
@@ -91,9 +100,17 @@ def build_sft_records(
 def build_preference_records(
     trajectories: List[Dict[str, object]],
     min_step_reward: float | None = 0.0,
+    survivors_only: bool = False,
+    min_final_money: float | None = None,
 ) -> List[Dict[str, object]]:
     records: List[Dict[str, object]] = []
     for trajectory in trajectories:
+        if not _trajectory_matches_filters(
+            trajectory,
+            survivors_only=survivors_only,
+            min_final_money=min_final_money,
+        ):
+            continue
         for step in trajectory["steps"]:
             if min_step_reward is not None and step["reward"] < min_step_reward:
                 continue
@@ -119,6 +136,20 @@ def build_preference_records(
                 }
             )
     return records
+
+
+def _trajectory_matches_filters(
+    trajectory: Dict[str, object],
+    survivors_only: bool = False,
+    min_final_money: float | None = None,
+) -> bool:
+    if survivors_only and trajectory.get("termination_reason") != "max_days":
+        return False
+    if min_final_money is not None:
+        final_state = trajectory.get("final_state", {})
+        if float(final_state.get("money", 0.0)) < min_final_money:
+            return False
+    return True
 
 
 def _format_training_prompt(step: Dict[str, object]) -> str:
@@ -173,6 +204,17 @@ def main() -> None:
         default=0.0,
         help="Only include preference steps with reward at or above this value.",
     )
+    parser.add_argument(
+        "--survivors-only",
+        action="store_true",
+        help="Only export examples from episodes that survive to the max horizon.",
+    )
+    parser.add_argument(
+        "--min-final-money",
+        type=float,
+        default=None,
+        help="Only export examples from episodes ending with at least this much money.",
+    )
     args = parser.parse_args()
 
     trajectories = collect_trajectories(
@@ -189,7 +231,12 @@ def main() -> None:
         f" output={args.output}"
     )
     if args.sft_output:
-        sft_records = build_sft_records(trajectories, min_step_reward=args.min_sft_reward)
+        sft_records = build_sft_records(
+            trajectories,
+            min_step_reward=args.min_sft_reward,
+            survivors_only=args.survivors_only,
+            min_final_money=args.min_final_money,
+        )
         save_jsonl(args.sft_output, sft_records)
         print(f"Saved SFT records count={len(sft_records)} output={args.sft_output}")
 
@@ -197,6 +244,8 @@ def main() -> None:
         preference_records = build_preference_records(
             trajectories,
             min_step_reward=args.min_preference_reward,
+            survivors_only=args.survivors_only,
+            min_final_money=args.min_final_money,
         )
         save_jsonl(args.preference_output, preference_records)
         print(
