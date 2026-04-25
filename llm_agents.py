@@ -151,7 +151,15 @@ class PromptedCEO:
             self.last_raw_response = None
             return fallback
 
-        raw_response = self.generator(f"{prompt.system_prompt}\n\n{prompt.user_prompt}")
+        if hasattr(self.generator, "generate_from_messages"):
+            raw_response = self.generator.generate_from_messages(
+                [
+                    {"role": "system", "content": prompt.system_prompt},
+                    {"role": "user", "content": prompt.user_prompt},
+                ]
+            )
+        else:
+            raw_response = self.generator(f"{prompt.system_prompt}\n\n{prompt.user_prompt}")
         self.last_raw_response = raw_response
         action = parse_action(raw_response, self.allowed_actions)
         if action is None:
@@ -242,7 +250,18 @@ class HuggingFaceActionGenerator:
         self.model = None
 
     def __call__(self, prompt: str) -> str:
+        return self.generate_from_messages([{"role": "user", "content": prompt}])
+
+    def generate_from_messages(self, messages) -> str:
         self._load()
+        if hasattr(self.tokenizer, "apply_chat_template"):
+            prompt = self.tokenizer.apply_chat_template(
+                messages,
+                tokenize=False,
+                add_generation_prompt=True,
+            )
+        else:
+            prompt = "\n\n".join(message["content"] for message in messages)
         inputs = self.tokenizer(prompt, return_tensors="pt").to(self.model.device)
         output_ids = self.model.generate(
             **inputs,
