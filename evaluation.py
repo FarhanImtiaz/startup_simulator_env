@@ -421,7 +421,7 @@ def main() -> None:
     parser.add_argument("--episodes", type=int, default=10)
     parser.add_argument("--horizon", type=int, default=30)
     parser.add_argument("--seed", type=int, default=7)
-    parser.add_argument("--agent-mode", choices=["heuristic", "prompt_scaffold"], default="heuristic")
+    parser.add_argument("--agent-mode", choices=["heuristic", "prompt_scaffold", "trained_ceo"], default="heuristic")
     parser.add_argument("--save-dir", default="outputs")
     args = parser.parse_args()
 

@@ -1,10 +1,11 @@
 import argparse
 import json
+import os
 from pathlib import Path
 
 from agents import ActionProposal, build_heuristic_agents
 from environment import StartupEnvironment
-from llm_agents import build_prompted_agents
+from llm_agents import build_prompted_agents, build_trained_ceo_agents
 
 
 def run_episode(
@@ -192,6 +193,11 @@ def _shorten(text: object, limit: int = 180) -> str:
 def _build_agent_stack(agent_mode: str):
     if agent_mode == "prompt_scaffold":
         return build_prompted_agents()
+    if agent_mode == "trained_ceo":
+        return build_trained_ceo_agents(
+            adapter_path=os.getenv("MASS_CEO_ADAPTER_PATH", "outputs/models/ceo-sft"),
+            base_model=os.getenv("MASS_CEO_BASE_MODEL", "Qwen/Qwen2.5-0.5B-Instruct"),
+        )
     return build_heuristic_agents()
 
 
@@ -216,7 +222,7 @@ def main() -> None:
     parser.add_argument("--seed", type=int, default=7)
     parser.add_argument("--quiet", action="store_true")
     parser.add_argument("--show-hidden-state", action="store_true")
-    parser.add_argument("--agent-mode", choices=["heuristic", "prompt_scaffold"], default="heuristic")
+    parser.add_argument("--agent-mode", choices=["heuristic", "prompt_scaffold", "trained_ceo"], default="heuristic")
     parser.add_argument("--log-detail", choices=["compact", "full"], default="compact")
     parser.add_argument("--save-summary", type=str, default=None)
     args = parser.parse_args()

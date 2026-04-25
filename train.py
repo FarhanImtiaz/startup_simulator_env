@@ -157,7 +157,7 @@ def main() -> None:
     parser.add_argument("--episodes", type=int, default=20)
     parser.add_argument("--horizon", type=int, default=30)
     parser.add_argument("--seed", type=int, default=7)
-    parser.add_argument("--agent-mode", choices=["heuristic", "prompt_scaffold"], default="heuristic")
+    parser.add_argument("--agent-mode", choices=["heuristic", "prompt_scaffold", "trained_ceo"], default="heuristic")
     parser.add_argument("--output", default="outputs/trajectories.json")
     parser.add_argument("--sft-output", default=None)
     parser.add_argument("--preference-output", default=None)
