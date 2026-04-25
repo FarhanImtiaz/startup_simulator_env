@@ -164,6 +164,8 @@ class PromptedCEO:
         action = parse_action(raw_response, self.allowed_actions)
         if action is None:
             return fallback
+        original_action = action
+        action = self._apply_safety_gate(action, fallback, observation)
         if (
             (observation.get("crisis_level") == "crisis" or observation.get("runway_hint", 999) < 2)
             and action in StartupEnvironment.CRISIS_DISALLOWED_ACTIONS
@@ -171,6 +173,14 @@ class PromptedCEO:
             return ActionProposal(
                 action="fire_employee",
                 reasoning=f"LLM safety override: {action} is disallowed in crisis, so selected fire_employee.",
+            )
+        if action != original_action:
+            return ActionProposal(
+                action=action,
+                reasoning=(
+                    f"LLM safety gate changed {original_action} to {action} "
+                    "because runway or cash risk was too high."
+                ),
             )
         return ActionProposal(action=action, reasoning=f"LLM-selected final decision: {action}")
 
