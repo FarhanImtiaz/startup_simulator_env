@@ -68,6 +68,31 @@ def _growth_strongly_negative(observation: Dict[str, object]) -> bool:
     return bool(growth_window) and sum(growth_window) / len(growth_window) < -15
 
 
+def _negative_growth_streak(observation: Dict[str, object]) -> int:
+    streak = 0
+    for growth in reversed(_last_3_growth(observation)):
+        if growth >= 0:
+            break
+        streak += 1
+    return streak
+
+
+def _mostly_negative_growth(observation: Dict[str, object]) -> bool:
+    growth_window = _last_3_growth(observation)
+    if not growth_window:
+        return observation.get("recent_user_growth", 0) < 0
+    negative_count = sum(1 for growth in growth_window if growth < 0)
+    return negative_count >= 2
+
+
+def _action_repeated_twice(observation: Dict[str, object], action: str) -> bool:
+    return observation.get("last_action") == action and observation.get("consecutive_action_streak", 0) >= 2
+
+
+def _recently_invested_in_product(observation: Dict[str, object]) -> bool:
+    return "invest_in_product" in observation.get("recent_actions", [])[-2:]
+
+
 class TechCoFounder(BaseCoFounder):
     def __init__(self):
         super().__init__("Tech Co-founder")
@@ -349,25 +374,33 @@ class CEO:
 
     def choose_action(self, proposals: Dict[str, ActionProposal], observation: Dict[str, object]) -> ActionProposal:
         if not proposals:
-            return ActionProposal(
-                action="do_nothing",
-                reasoning="No co-founder proposals were available, so the safest fallback is to wait one turn.",
-            )
+            proposals = {}
 
         focus, focus_reason = self._determine_focus(observation)
-        policy_action = self._choose_by_runway_policy(proposals, observation, focus)
-        if policy_action is not None:
-            best_agent_name, best_proposal, policy_reason = policy_action
-            return ActionProposal(
-                action=best_proposal.action,
-                reasoning=(
-                    f"CEO prioritized {focus} because {focus_reason}. "
-                    f"Crisis status is {observation.get('crisis_level', 'unknown')} ({observation.get('crisis_reason', 'no crisis reason')}). "
-                    f"Runway={observation['runway_hint']}, last_3_growth={observation['last_3_growth']}, recent_events={observation['recent_events']}. "
-                    f"{policy_reason} Selected {best_proposal.action} from {best_agent_name}. "
-                    f"Co-founder rationale: {best_proposal.reasoning}"
-                ),
-            )
+        action, mode, trigger, choice_reason, rejected = self._choose_strict_policy_action(observation)
+        action, rejected, override_reason = self._apply_strict_anti_patterns(action, observation, rejected)
+        if override_reason:
+            choice_reason = override_reason
+        matching_proposal = self._find_matching_proposal(proposals, action)
+        proposal_context = (
+            f" Supporting proposal: {matching_proposal.reasoning}"
+            if matching_proposal is not None
+            else " No co-founder proposal matched the strict CEO policy, so the CEO synthesized the action."
+        )
+
+        return ActionProposal(
+            action=action,
+            reasoning=(
+                f"Mode: {mode}. "
+                f"Trigger: {trigger}. "
+                f"Selected action: {action}. {choice_reason}. "
+                f"Rejected options: {rejected}. "
+                f"Checked runway={observation['runway_hint']}, last_3_growth={observation['last_3_growth']}, "
+                f"recent_events={observation['recent_events']}. "
+                f"Policy focus: {focus} ({focus_reason})."
+                f"{proposal_context}"
+            ),
+        )
 
         best_agent_name = None
         best_proposal = None
@@ -413,6 +446,219 @@ class CEO:
                 f"Co-founder rationale: {best_proposal.reasoning}"
             ),
         )
+
+    def _choose_strict_policy_action(self, observation: Dict[str, object]) -> Tuple[str, str, str, str, str]:
+        runway = observation["runway_hint"]
+        growth = observation.get("recent_user_growth", 0)
+        trend = observation["trend_direction"]
+        negative_streak = _negative_growth_streak(observation)
+        mostly_negative = _mostly_negative_growth(observation)
+        team_size = observation["team_size"]
+        recent_actions = observation.get("recent_actions", [])
+        last_action = observation.get("last_action")
+
+        if runway < 2.0:
+            if team_size > 1 and not _action_repeated_twice(observation, "fire_employee"):
+                return (
+                    "fire_employee",
+                    "Survival",
+                    "runway is below 2, so burn reduction is mandatory",
+                    "fire_employee is the fastest available burn reduction and takes priority over recovery or optimization",
+                    "marketing and hiring are forbidden; do_nothing does not reduce burn; pivot is secondary to immediate burn reduction",
+                )
+            if not (last_action == "do_nothing" and observation.get("consecutive_action_streak", 0) >= 2):
+                return (
+                    "do_nothing",
+                    "Survival",
+                    "runway is below 2 and further firing is unavailable or already repeated",
+                    "do_nothing preserves cash without adding burn while the company is in survival mode",
+                    "marketing and hiring are forbidden; pivot is avoided while cash is critically low unless inaction has already repeated",
+                )
+            return (
+                "pivot_strategy",
+                "Survival",
+                "runway is below 2 and do_nothing has already repeated",
+                "pivot_strategy is the remaining reversible intervention after burn reduction and cash preservation are exhausted",
+                "marketing and hiring are forbidden; repeated do_nothing during crisis is forbidden; firing is unavailable or already repeated",
+            )
+
+        if negative_streak >= 3:
+            if not _recently_invested_in_product(observation):
+                return (
+                    "invest_in_product",
+                    "Recovery",
+                    "growth has been negative for 3 consecutive turns",
+                    "invest_in_product is the default recovery intervention when the company has not recently repaired the product",
+                    "do_nothing is forbidden during decline; marketing is risky before retention improves; pivot is reserved for decline after product investment",
+                )
+            return (
+                "pivot_strategy",
+                "Recovery",
+                "growth has stayed negative after recent product investment",
+                "pivot_strategy is the next recovery move because product intervention has already been tried recently",
+                "do_nothing is forbidden during decline; marketing and hiring are rejected; product was already tried recently, so pivot is preferred unless anti-freeze blocks it",
+            )
+
+        if mostly_negative or trend == "declining":
+            if _recently_invested_in_product(observation) or _action_repeated_twice(observation, "invest_in_product"):
+                return (
+                    "pivot_strategy",
+                "Recovery",
+                "last_3_growth is mostly negative or users are decreasing",
+                "pivot_strategy is justified because decline is continuing after recent or repeated product work",
+                "do_nothing is forbidden during decline; hiring increases burn; marketing can amplify a leaky product; more product work is lower priority unless anti-freeze blocks pivot",
+            )
+            return (
+                "invest_in_product",
+                "Recovery",
+                "last_3_growth is mostly negative or users are decreasing",
+                "invest_in_product is the default intervention to improve retention and product quality before chasing growth",
+                "do_nothing is forbidden during decline; pivot waits until product intervention has been tried; hiring increases burn",
+            )
+
+        if runway < 3.0:
+            if team_size > 1 and not _action_repeated_twice(observation, "fire_employee"):
+                return (
+                    "fire_employee",
+                    "Survival",
+                    "runway is below 3, so cash preservation dominates",
+                    "fire_employee extends runway and avoids adding burn",
+                    "hiring is forbidden; marketing is too cash-intensive; pivot is avoided without strong decline",
+                )
+            return (
+                "invest_in_product",
+                "Optimization",
+                "runway is below 3 but immediate firing is unavailable or already repeated",
+                "invest_in_product is the safest active default because do_nothing should not be the default",
+                "hiring is forbidden; marketing is cautious under low runway; pivot is reserved for sustained decline",
+            )
+
+        if growth > 50 and trend == "improving" and runway > 3.0:
+            return (
+                "run_marketing_campaign",
+                "Optimization",
+                "growth is strongly positive and trend is improving",
+                "run_marketing_campaign captures momentum without increasing fixed costs",
+                "hiring is rejected because fixed costs should not rise on short-term signals; do_nothing wastes momentum; pivot is unnecessary",
+            )
+
+        if 3.0 <= runway <= 6.0:
+            return (
+                "invest_in_product",
+                "Optimization",
+                "runway is mid-stage, so efficiency matters",
+                "invest_in_product improves quality without permanent burn increase",
+                "hiring is forbidden in mid-stage runway; marketing is selective and only used for strong improving growth; do_nothing is not the default",
+            )
+
+        if runway > 6.0:
+            if (
+                _growth_consistently_positive(observation)
+                and "viral_growth" not in observation.get("recent_events", [])
+                and not _action_repeated_twice(observation, "hire_employee")
+            ):
+                return (
+                    "hire_employee",
+                    "Optimization",
+                    "runway is healthy and all last 3 growth values are positive without a recent viral spike",
+                    "hire_employee is allowed rarely because the company has enough runway and stable growth",
+                    "do_nothing is not the default; pivot is unnecessary; product and marketing remain valid but capacity can now compound execution",
+                )
+            if recent_actions[-2:] == ["invest_in_product", "invest_in_product"]:
+                return (
+                    "run_marketing_campaign",
+                    "Optimization",
+                    "runway is healthy and product investment has already repeated twice",
+                    "run_marketing_campaign balances growth and product work without adding fixed costs",
+                    "repeating invest_in_product is forbidden; hiring is rejected unless growth is consistently positive and not viral-driven",
+                )
+            return (
+                "invest_in_product",
+                "Optimization",
+                "no stronger survival or recovery rule applies",
+                "invest_in_product is the default active choice and avoids passive drift",
+                "do_nothing is not the default; hiring is rare; pivot waits for sustained decline",
+            )
+
+        return (
+            "invest_in_product",
+            "Optimization",
+            "no stronger rule applies",
+            "invest_in_product is the default active choice",
+            "do_nothing is not the default; hiring and marketing require stronger evidence",
+        )
+
+    def _apply_strict_anti_patterns(
+        self,
+        action: str,
+        observation: Dict[str, object],
+        rejected: str,
+    ) -> Tuple[str, str, str]:
+        growth = observation.get("recent_user_growth", 0)
+        last_action = observation.get("last_action")
+        runway = observation["runway_hint"]
+        trend = observation["trend_direction"]
+
+        if action == "do_nothing":
+            do_nothing_allowed = (
+                growth >= 0
+                and last_action != "do_nothing"
+                and not _mostly_negative_growth(observation)
+                and trend != "declining"
+            )
+            if not do_nothing_allowed:
+                if runway < 2.0:
+                    replacement = "fire_employee" if observation["team_size"] > 1 else "pivot_strategy"
+                else:
+                    replacement = "fire_employee" if runway < 3.0 and observation["team_size"] > 1 else "invest_in_product"
+                return (
+                    replacement,
+                    f"{rejected}; do_nothing is forbidden because growth is negative, repeated, or decline is sustained",
+                    f"{replacement} is the safest allowed replacement because do_nothing is forbidden by the anti-freeze rule",
+                )
+
+        if _action_repeated_twice(observation, action):
+            replacement = self._best_non_repeated_action(action, observation)
+            return (
+                replacement,
+                f"{rejected}; {action} was already repeated twice, so repetition control forced {replacement}",
+                f"{replacement} is the best non-repeated action after {action} hit the two-turn repetition limit",
+            )
+
+        if last_action == action and growth < 0:
+            replacement = self._best_non_repeated_action(action, observation)
+            return (
+                replacement,
+                f"{rejected}; the last {action} led into negative growth, so repetition control forced {replacement}",
+                f"{replacement} avoids repeating {action} after it led into negative growth",
+            )
+
+        return action, rejected, ""
+
+    def _best_non_repeated_action(self, action: str, observation: Dict[str, object]) -> str:
+        runway = observation["runway_hint"]
+        if runway < 2.0:
+            for candidate in ("fire_employee", "do_nothing", "pivot_strategy"):
+                if candidate != action:
+                    return candidate
+        if _mostly_negative_growth(observation) or observation["trend_direction"] == "declining":
+            for candidate in ("invest_in_product", "pivot_strategy"):
+                if candidate != action:
+                    return candidate
+        for candidate in ("invest_in_product", "run_marketing_campaign", "pivot_strategy", "do_nothing"):
+            if candidate != action:
+                return candidate
+        return "invest_in_product"
+
+    @staticmethod
+    def _find_matching_proposal(
+        proposals: Dict[str, ActionProposal],
+        action: str,
+    ) -> ActionProposal | None:
+        for proposal in proposals.values():
+            if proposal.action == action:
+                return proposal
+        return None
 
     def _choose_by_runway_policy(
         self,
