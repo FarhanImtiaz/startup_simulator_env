@@ -67,6 +67,8 @@ The startup can succeed or fail based on product quality, user growth, cash runw
 - `openenv_wrapper.py`: minimal reset/step wrapper for direct training-style integrations.
 - `train.py`: trajectory collection and SFT/preference dataset export.
 - `train_ceo_sft.py`: Hugging Face TRL SFT script for the CEO policy.
+- `compare_policies.py`: one-command baseline vs trained CEO comparison.
+- `app.py`: Gradio Hugging Face Space demo.
 - `Project_Overview.md`: original hackathon/product framing.
 - `TEMP_IMPLEMENTATION_CHECKLIST.md`: temporary progress tracker.
 - `TEMP_CODEBASE_GUIDE.md`: temporary deep codebase walkthrough for development and onboarding.
@@ -107,6 +109,18 @@ Run trained CEO evaluation after placing a LoRA adapter at `outputs/models/ceo-s
 
 ```bash
 python3 evaluation.py --episodes 20 --horizon 30 --agent-mode trained_ceo --save-dir outputs/eval_trained
+```
+
+Generate the final before/after comparison artifacts:
+
+```bash
+python3 compare_policies.py --output-dir outputs/comparison
+```
+
+Run the local Gradio demo:
+
+```bash
+python3 app.py
 ```
 
 Collect trajectories for later training work:
@@ -173,6 +187,8 @@ Final comparison over 20 episodes, horizon 30:
 
 ![Baseline vs trained CEO metrics](docs/assets/reward_comparison.png)
 
+![Policy comparison](docs/assets/policy_comparison.png)
+
 ## Outputs
 
 Typical generated outputs include:
@@ -193,6 +209,9 @@ Typical generated outputs include:
 - `docs/assets/loss_curve.png`
 - `docs/assets/reward_curve.png`
 - `docs/assets/reward_comparison.png`
+- `docs/assets/policy_comparison.png`
+- `docs/comparison_summary.json`
+- `docs/comparison_report.md`
 
 These are useful for inspecting step-by-step behavior and bootstrapping future training or evaluation work.
 
@@ -233,6 +252,12 @@ env = StartupOpenEnv(max_days=3, seed=7)
 obs = env.reset()
 obs = env.step(StartupAction(action="invest_in_product"))
 print(obs.reward, obs.done, env.state.step_count)
+```
+
+Validation helper:
+
+```bash
+python3 scripts/validate_openenv_package.py
 ```
 
 Server entrypoint:

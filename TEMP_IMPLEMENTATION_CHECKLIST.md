@@ -210,7 +210,7 @@ Use it as the running build sheet while the project is being implemented.
 
 These are the items the validation pass looks for. If any is missing or broken at the deadline, the submission will not make it to a human judge, regardless of how strong the underlying idea is. Verify each one explicitly before submitting.
 
-- [ ] Public, cloneable Hugging Face Space at the submitted URL
+- [-] Public, cloneable Hugging Face Space at the submitted URL
   - [ ] Test from a logged-out browser
   - [ ] Confirm the Space is not private
   - [ ] Confirm the submitted link is not dead or returning 404
@@ -267,6 +267,9 @@ These are the items the validation pass looks for. If any is missing or broken a
 - [x] Phase 3: add trained CEO mode, safety gate, and before/after metrics
 - [x] Phase 3: commit PNG loss and reward artifacts
 - [x] Phase 3: add Dockerfile and Colab notebook skeleton
+- [x] Phase 4: add Gradio Space demo
+- [x] Phase 4: add `compare_policies.py`
+- [x] Phase 4: add OpenEnv validation helper
 
 ## 17. Files To Touch Next
 
