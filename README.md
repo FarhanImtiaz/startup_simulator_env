@@ -74,16 +74,39 @@ Run a short verbose simulation with hidden state debugging:
 python3 simulate.py --horizon 10 --show-hidden-state
 ```
 
+Use the full old-style trace when you want every reward component and full reasoning:
+
+```bash
+python3 simulate.py --horizon 10 --log-detail full
+```
+
 Save a single episode summary:
 
 ```bash
 python3 simulate.py --quiet --save-summary outputs/single_episode.json
 ```
 
+Run a baseline evaluation with report artifacts:
+
+```bash
+python3 evaluation.py --episodes 20 --horizon 30 --save-dir outputs/eval
+```
+
 Collect trajectories for later training work:
 
 ```bash
 python3 train.py --episodes 20 --horizon 30 --output outputs/trajectories.json
+```
+
+Export training-ready CEO decision datasets:
+
+```bash
+python3 train.py \
+  --episodes 20 \
+  --horizon 30 \
+  --output outputs/trajectories.json \
+  --sft-output outputs/ceo_sft.jsonl \
+  --preference-output outputs/ceo_preferences.jsonl
 ```
 
 ## Agent Modes
@@ -105,7 +128,17 @@ Typical generated outputs include:
 
 - `outputs/single_episode.json`
 - `outputs/trajectories.json`
+- `outputs/ceo_sft.jsonl`
+- `outputs/ceo_preferences.jsonl`
 - `outputs/trajectories_prompt.json`
+- `outputs/eval/evaluation_summary.json`
+- `outputs/eval/episode_metrics.csv`
+- `outputs/eval/step_metrics.csv`
+- `outputs/eval/action_distribution.csv`
+- `outputs/eval/baseline_report.md`
+- `outputs/eval/reward_curve.svg`
+- `outputs/eval/outcome_curve.svg`
+- `outputs/eval/action_distribution.svg`
 
 These are useful for inspecting step-by-step behavior and bootstrapping future training or evaluation work.
 
@@ -120,6 +153,7 @@ What is implemented:
 - role-based heuristic decision flow
 - single-episode simulation
 - trajectory collection
+- SFT and preference dataset export for CEO decision training
 - prompt scaffolding for future LLM control
 
 What is not implemented yet:
@@ -131,13 +165,7 @@ What is not implemented yet:
 
 ## Known Limitation
 
-`evaluation.py` is close, but the current step-level CSV export path is not fully aligned with the richer per-step log format produced by `simulate.py`.
-
-In practice:
-
-- `simulate.py` works
-- `train.py` works for trajectory collection
-- `evaluation.py` may need a small export fix before relying on CSV step dumps
+The Phase 2 evaluation flow now exports flat CSVs, a Markdown baseline report, and lightweight SVG plots without requiring plotting dependencies.
 
 ## If You Want To Understand The Codebase
 
@@ -152,7 +180,6 @@ Then use `TEMP_CODEBASE_GUIDE.md` for the detailed file-by-file and function-by-
 
 ## Next Good Improvements
 
-- fix the `evaluation.py` step CSV export mismatch
 - add tests for environment transitions and reward behavior
 - make action costs and reward weights configurable
 - improve disagreement quality between heuristic agents

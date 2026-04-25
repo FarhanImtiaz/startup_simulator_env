@@ -16,7 +16,7 @@ Use it as the running build sheet while the project is being implemented.
   - Long-horizon decision environment
   - Professional world modeling setup
 - [x] Keep the repo aligned with `Project_Overview.md`
-- [-] Keep temporary implementation notes up to date
+- [x] Keep temporary implementation notes up to date
 
 ## 2. Environment Core
 
@@ -120,6 +120,8 @@ Use it as the running build sheet while the project is being implemented.
 - [x] Accumulate reward over episode
 - [x] Stop on termination
 - [x] Print step-by-step logs
+- [x] Add compact readable simulation logs
+- [x] Preserve full verbose logs behind a CLI flag
 - [x] Return structured episode summary
 - [x] Add multi-episode runner
 - [x] Add command-line options for seeds, horizon, and verbosity
@@ -136,7 +138,9 @@ Use it as the running build sheet while the project is being implemented.
 - [x] Compute growth consistency
 - [x] Compute decision efficiency
 - [x] Add baseline metric summaries
-- [ ] Add reward and outcome plots
+- [x] Add reward and outcome plots
+- [x] Add action distribution export
+- [x] Add baseline Markdown report
 
 ## 8. Evaluation Pipeline
 
@@ -146,6 +150,8 @@ Use it as the running build sheet while the project is being implemented.
 - [x] Compare behavior across random seeds
 - [-] Identify common failure modes
 - [x] Produce judge-friendly summary outputs
+- [x] Fix step-level CSV export mismatch
+- [x] Add flat evaluation exports for analysis
 
 ## 9. OpenEnv / Training Interface
 
@@ -172,10 +178,12 @@ Use it as the running build sheet while the project is being implemented.
 
 - [x] Create training script
 - [x] Run episodes to collect trajectories
-- [-] Store prompts, actions, outcomes, rewards
+- [x] Store prompts, actions, outcomes, rewards
 - [ ] Optimize policy using rewards
 - [ ] Support repeated training cycles
 - [x] Save trajectory outputs for future training
+- [x] Export SFT-style JSONL records
+- [x] Export preference-style JSONL records
 - [-] Document how to reproduce training
 
 ## 12. Before vs After Comparison
@@ -249,36 +257,36 @@ These are the items the validation pass looks for. If any is missing or broken a
 - [x] Add OpenEnv-compatible wrapper
 - [x] Add LLM prompt-based agent interface
 - [x] Add training pipeline scaffold
+- [x] Phase 2: repair evaluation exports
+- [x] Phase 2: add baseline report and lightweight plots
+- [x] Phase 2: make simulation logs easier to read
+- [x] Phase 2: document evaluation artifacts in README
+- [x] Slim `agents.py` back to the maintainable heuristic baseline
+- [x] Add training-ready SFT and preference dataset exports
 
 ## 17. Files To Touch Next
 
-- `environment.py`
-  - continue reward and dynamics tuning
-  - expose evaluation-friendly outputs
-- `agents.py`
-  - improve beliefs and disagreement patterns
-- `simulate.py`
-  - add CLI flags and multi-episode support
 - `evaluation.py`
-  - aggregate baseline performance
-  - save JSON and CSV metrics
-- `llm_agents.py`
-  - prompt scaffolding and safe parsing
-- `openenv_wrapper.py`
-  - training-friendly env adapter
+  - add before/after comparison mode once a trained or alternate policy exists
+- `agents.py`
+  - continue survival and cash behavior tuning
+- `train.py`
+  - convert collected trajectories into an optimizer-ready dataset
 - `README.md`
-  - keep instructions aligned with implementation
+  - document new Phase 2 evaluation artifacts
+- `llm_agents.py`
+  - wire prompt scaffolding to a real model backend
+- `openenv_wrapper.py`
+  - tighten compatibility with a chosen training framework
 - `TEMP_IMPLEMENTATION_CHECKLIST.md`
   - update statuses as work progresses
-- `train.py`
-  - trajectory collection scaffold for future training
 
 ## 18. Current Snapshot
 
 - Environment core: strong prototype
 - Advanced uncertainty features: implemented first pass
 - Multi-agent proposal flow: implemented
-- Evaluation pipeline: implemented first pass
+- Evaluation pipeline: Phase 2 baseline reporting implemented
 - LLM integration: scaffolded without live model calls
 - Training: scaffolded only, optimization still deferred
 - Demo packaging: missing

@@ -13,6 +13,7 @@ def run_episode(
     verbose: bool = True,
     show_hidden_state: bool = False,
     agent_mode: str = "heuristic",
+    log_detail: str = "compact",
 ) -> dict:
     observation = env.reset()
     tech, growth, finance, ceo = _build_agent_stack(agent_mode)
@@ -68,36 +69,10 @@ def run_episode(
         episode_log.append(log_row)
 
         if verbose:
-            print(f"Day {observation['day']}: CEO chose {selected.action}")
-            for name, proposal in proposals.items():
-                print(f"  {name}: {proposal.action} | {proposal.reasoning}")
-            print(
-                "  obs:"
-                f" growth={observation['recent_user_growth']},"
-                f" last_3_growth={observation['last_3_growth']},"
-                f" trend={observation['trend_direction']},"
-                f" ad={observation['ad_performance']},"
-                f" runway_hint={observation['runway_hint']},"
-                f" crisis={observation['is_crisis']},"
-                f" crisis_level={observation['crisis_level']},"
-                f" last_action={observation['last_action']},"
-                f" streak={observation['consecutive_action_streak']},"
-                f" events={observation['recent_events']}"
-            )
-            print(f"  crisis_reason={observation['crisis_reason']}")
-            print(f"  CEO reasoning: {selected.reasoning}")
-            print(
-                "  result:"
-                f" reward={result['reward']},"
-                f" raw_reward={result.get('raw_reward')},"
-                f" event={result['event']},"
-                f" termination_reason={result.get('termination_reason')},"
-                f" money={result['state']['money']},"
-                f" users={result['state']['users']},"
-                f" quality={result['state']['product_quality']}"
-            )
-            print(f"  reward_details={result.get('reward_details')}")
-            print(f"  agent_rewards={result['agent_rewards']}")
+            if log_detail == "full":
+                _print_full_step(observation, proposals, selected, result)
+            else:
+                _print_compact_step(observation, proposals, selected, result)
             if show_hidden_state:
                 print(f"  debug_hidden={result['debug_state']['hidden_state']}")
                 print(f"  pending_effects={result['debug_state']['pending_effects']}")
@@ -128,6 +103,92 @@ def run_episode(
     return summary
 
 
+def _print_compact_step(
+    observation: dict,
+    proposals: dict,
+    selected: ActionProposal,
+    result: dict,
+) -> None:
+    proposal_summary = ", ".join(
+        f"{_short_role_name(name)}={proposal.action}"
+        for name, proposal in proposals.items()
+    )
+    print(
+        f"Day {observation['day']:>2} | "
+        f"CEO={selected.action:<22} | "
+        f"reward={result['reward']:>6} | "
+        f"money={result['state']['money']:>9} | "
+        f"users={result['state']['users']:>4} | "
+        f"quality={result['state']['product_quality']}"
+    )
+    print(
+        "  signal: "
+        f"growth={observation['recent_user_growth']}, "
+        f"last3={observation['last_3_growth']}, "
+        f"trend={observation['trend_direction']}, "
+        f"runway={observation['runway_hint']}, "
+        f"crisis={observation['crisis_level']}, "
+        f"event={result['event']}"
+    )
+    print(f"  proposals: {proposal_summary}")
+    print(f"  CEO: {_shorten(selected.reasoning, 220)}")
+
+
+def _print_full_step(
+    observation: dict,
+    proposals: dict,
+    selected: ActionProposal,
+    result: dict,
+) -> None:
+    print(f"Day {observation['day']}: CEO chose {selected.action}")
+    for name, proposal in proposals.items():
+        print(f"  {name}: {proposal.action} | {proposal.reasoning}")
+    print(
+        "  obs:"
+        f" growth={observation['recent_user_growth']},"
+        f" last_3_growth={observation['last_3_growth']},"
+        f" trend={observation['trend_direction']},"
+        f" ad={observation['ad_performance']},"
+        f" runway_hint={observation['runway_hint']},"
+        f" crisis={observation['is_crisis']},"
+        f" crisis_level={observation['crisis_level']},"
+        f" last_action={observation['last_action']},"
+        f" streak={observation['consecutive_action_streak']},"
+        f" events={observation['recent_events']}"
+    )
+    print(f"  crisis_reason={observation['crisis_reason']}")
+    print(f"  CEO reasoning: {selected.reasoning}")
+    print(
+        "  result:"
+        f" reward={result['reward']},"
+        f" raw_reward={result.get('raw_reward')},"
+        f" event={result['event']},"
+        f" termination_reason={result.get('termination_reason')},"
+        f" money={result['state']['money']},"
+        f" users={result['state']['users']},"
+        f" quality={result['state']['product_quality']}"
+    )
+    print(f"  reward_details={result.get('reward_details')}")
+    print(f"  agent_rewards={result['agent_rewards']}")
+
+
+def _short_role_name(name: str) -> str:
+    if name.startswith("Tech"):
+        return "Tech"
+    if name.startswith("Growth"):
+        return "Growth"
+    if name.startswith("Finance"):
+        return "Finance"
+    return name
+
+
+def _shorten(text: object, limit: int = 180) -> str:
+    value = " ".join(str(text).split())
+    if len(value) <= limit:
+        return value
+    return value[: max(0, limit - 3)] + "..."
+
+
 def _build_agent_stack(agent_mode: str):
     if agent_mode == "prompt_scaffold":
         return build_prompted_agents()
@@ -156,6 +217,7 @@ def main() -> None:
     parser.add_argument("--quiet", action="store_true")
     parser.add_argument("--show-hidden-state", action="store_true")
     parser.add_argument("--agent-mode", choices=["heuristic", "prompt_scaffold"], default="heuristic")
+    parser.add_argument("--log-detail", choices=["compact", "full"], default="compact")
     parser.add_argument("--save-summary", type=str, default=None)
     args = parser.parse_args()
 
@@ -166,6 +228,7 @@ def main() -> None:
         verbose=not args.quiet,
         show_hidden_state=args.show_hidden_state,
         agent_mode=args.agent_mode,
+        log_detail=args.log_detail,
     )
 
     if args.save_summary:

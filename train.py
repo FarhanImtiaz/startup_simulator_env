@@ -44,15 +44,135 @@ def save_trajectories(path: str, trajectories: List[Dict[str, object]]) -> None:
     output_path.write_text(json.dumps(trajectories, indent=2), encoding="utf-8")
 
 
+def save_jsonl(path: str, records: List[Dict[str, object]]) -> None:
+    output_path = Path(path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    with output_path.open("w", encoding="utf-8") as handle:
+        for record in records:
+            handle.write(json.dumps(record, ensure_ascii=True) + "\n")
+
+
+def build_sft_records(
+    trajectories: List[Dict[str, object]],
+    min_step_reward: float | None = None,
+) -> List[Dict[str, object]]:
+    records: List[Dict[str, object]] = []
+    for trajectory in trajectories:
+        for step in trajectory["steps"]:
+            if min_step_reward is not None and step["reward"] < min_step_reward:
+                continue
+            records.append(
+                {
+                    "episode_index": trajectory["episode_index"],
+                    "day": step["day"],
+                    "reward": step["reward"],
+                    "messages": [
+                        {
+                            "role": "system",
+                            "content": (
+                                "You are the CEO in a startup simulator. Choose one valid action "
+                                "from co-founder proposals while balancing survival, recovery, and growth."
+                            ),
+                        },
+                        {
+                            "role": "user",
+                            "content": _format_training_prompt(step),
+                        },
+                        {
+                            "role": "assistant",
+                            "content": f"Action: {step['chosen_action']}",
+                        },
+                    ],
+                }
+            )
+    return records
+
+
+def build_preference_records(
+    trajectories: List[Dict[str, object]],
+    min_step_reward: float | None = 0.0,
+) -> List[Dict[str, object]]:
+    records: List[Dict[str, object]] = []
+    for trajectory in trajectories:
+        for step in trajectory["steps"]:
+            if min_step_reward is not None and step["reward"] < min_step_reward:
+                continue
+
+            rejected_actions = sorted(
+                {
+                    proposal["action"]
+                    for proposal in step.get("proposals", {}).values()
+                    if proposal["action"] != step["chosen_action"]
+                }
+            )
+            if not rejected_actions:
+                continue
+
+            records.append(
+                {
+                    "episode_index": trajectory["episode_index"],
+                    "day": step["day"],
+                    "reward": step["reward"],
+                    "prompt": _format_training_prompt(step),
+                    "chosen": f"Action: {step['chosen_action']}",
+                    "rejected": f"Action: {rejected_actions[0]}",
+                }
+            )
+    return records
+
+
+def _format_training_prompt(step: Dict[str, object]) -> str:
+    observation = step["observation"]
+    proposal_lines = [
+        f"- {name}: {proposal['action']} | {proposal['reasoning']}"
+        for name, proposal in step.get("proposals", {}).items()
+    ]
+    return (
+        "Observed startup state:\n"
+        f"- Day: {observation['day']}\n"
+        f"- Money: {observation['money']}\n"
+        f"- Users: {observation['users']}\n"
+        f"- Product quality: {observation['product_quality']}\n"
+        f"- Team size: {observation['team_size']}\n"
+        f"- Burn rate: {observation['burn_rate']}\n"
+        f"- Recent user growth: {observation['recent_user_growth']}\n"
+        f"- Last 3 growth: {observation['last_3_growth']}\n"
+        f"- Trend direction: {observation['trend_direction']}\n"
+        f"- Ad performance: {observation['ad_performance']}\n"
+        f"- Runway hint: {observation['runway_hint']}\n"
+        f"- Crisis level: {observation['crisis_level']}\n"
+        f"- Crisis reason: {observation['crisis_reason']}\n"
+        f"- Recent events: {observation['recent_events']}\n"
+        f"- Recent actions: {observation['recent_actions']}\n\n"
+        "Co-founder proposals:\n"
+        f"{chr(10).join(proposal_lines)}\n\n"
+        "Respond with exactly one line: Action: <action_name>"
+    )
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Collect startup simulator trajectories for future training runs."
+        description="Collect startup simulator trajectories and training-ready decision datasets."
     )
     parser.add_argument("--episodes", type=int, default=20)
     parser.add_argument("--horizon", type=int, default=30)
     parser.add_argument("--seed", type=int, default=7)
     parser.add_argument("--agent-mode", choices=["heuristic", "prompt_scaffold"], default="heuristic")
     parser.add_argument("--output", default="outputs/trajectories.json")
+    parser.add_argument("--sft-output", default=None)
+    parser.add_argument("--preference-output", default=None)
+    parser.add_argument(
+        "--min-sft-reward",
+        type=float,
+        default=None,
+        help="Only include SFT steps with reward at or above this value. Defaults to all steps.",
+    )
+    parser.add_argument(
+        "--min-preference-reward",
+        type=float,
+        default=0.0,
+        help="Only include preference steps with reward at or above this value.",
+    )
     args = parser.parse_args()
 
     trajectories = collect_trajectories(
@@ -68,7 +188,24 @@ def main() -> None:
         f" episodes={len(trajectories)}"
         f" output={args.output}"
     )
-    print("Training optimization is intentionally left out here because it requires model compute resources.")
+    if args.sft_output:
+        sft_records = build_sft_records(trajectories, min_step_reward=args.min_sft_reward)
+        save_jsonl(args.sft_output, sft_records)
+        print(f"Saved SFT records count={len(sft_records)} output={args.sft_output}")
+
+    if args.preference_output:
+        preference_records = build_preference_records(
+            trajectories,
+            min_step_reward=args.min_preference_reward,
+        )
+        save_jsonl(args.preference_output, preference_records)
+        print(
+            "Saved preference records"
+            f" count={len(preference_records)}"
+            f" output={args.preference_output}"
+        )
+
+    print("Optimizer/fine-tuning execution is still external; this script now prepares the data for it.")
 
 
 if __name__ == "__main__":
