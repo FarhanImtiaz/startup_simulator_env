@@ -174,6 +174,34 @@ class PromptedCEO:
             )
         return ActionProposal(action=action, reasoning=f"LLM-selected final decision: {action}")
 
+    def _apply_safety_gate(
+        self,
+        action: str,
+        fallback: ActionProposal,
+        observation: Dict[str, object],
+    ) -> str:
+        runway = float(observation.get("runway_hint", 999))
+        money = float(observation.get("money", 0.0))
+        burn_rate = float(observation.get("burn_rate", 1.0))
+        recent_actions = list(observation.get("recent_actions", []))
+        low_runway = runway < 4
+        cash_stress = money < burn_rate * 4
+        repeated_growth_spend = recent_actions[-2:].count("run_marketing_campaign") >= 2
+
+        if action in {"run_marketing_campaign", "hire_employee"} and (
+            low_runway or cash_stress or repeated_growth_spend
+        ):
+            if fallback.action not in StartupEnvironment.CRISIS_DISALLOWED_ACTIONS:
+                return fallback.action
+            return "fire_employee"
+
+        if action == "invest_in_product" and runway < 2:
+            if fallback.action not in StartupEnvironment.CRISIS_DISALLOWED_ACTIONS:
+                return fallback.action
+            return "fire_employee"
+
+        return action
+
     def build_prompt(
         self,
         proposals: Dict[str, ActionProposal],
