@@ -185,28 +185,30 @@ class PromptedCEO:
             for agent_name, proposal in proposals.items()
         ]
         user_prompt = (
-            f"{_format_observation(observation)}\n\n"
+            "Observed startup state:\n"
+            f"- Day: {observation['day']}\n"
+            f"- Money: {observation['money']}\n"
+            f"- Users: {observation['users']}\n"
+            f"- Product quality: {observation['product_quality']}\n"
+            f"- Team size: {observation['team_size']}\n"
+            f"- Burn rate: {observation['burn_rate']}\n"
+            f"- Recent user growth: {observation['recent_user_growth']}\n"
+            f"- Last 3 growth: {observation['last_3_growth']}\n"
+            f"- Trend direction: {observation['trend_direction']}\n"
+            f"- Ad performance: {observation['ad_performance']}\n"
+            f"- Runway hint: {observation['runway_hint']}\n"
+            f"- Crisis level: {observation['crisis_level']}\n"
+            f"- Crisis reason: {observation['crisis_reason']}\n"
+            f"- Recent events: {observation['recent_events']}\n"
+            f"- Recent actions: {observation['recent_actions']}\n\n"
             "Co-founder proposals:\n"
             f"{chr(10).join(proposal_lines)}\n\n"
-            f"Allowed actions: {', '.join(self.allowed_actions)}\n"
-            f"Fallback action if uncertain: {fallback.action}\n"
-            "Strict CEO priority order: Survival, then Recovery, then Optimization.\n"
-            "Survival mode: if runway is below 2, reduce burn immediately with fire_employee if possible; never choose run_marketing_campaign or hire_employee.\n"
-            "Recovery mode: if growth has been negative for 3 consecutive turns, do not wait; choose invest_in_product unless product was recently invested in, otherwise pivot_strategy.\n"
-            "Anti-freeze: never choose the same action more than 2 times in a row; if last action was do_nothing and growth is negative, do_nothing is forbidden.\n"
-            "Decline response: if last_3_growth is mostly negative or users are consistently decreasing, intervene with invest_in_product by default or pivot_strategy if decline continues.\n"
-            "Runway rules: above 6 allows product/growth and rare hiring; 3 to 6 avoids hiring and prefers product; below 3 prioritizes cash preservation.\n"
-            "Growth capture: if growth is strongly positive and trend is improving, choose run_marketing_campaign unless a higher-priority survival or recovery rule applies.\n"
-            "Default: choose invest_in_product; do not default to do_nothing.\n"
-            "Output reasoning should cover mode, trigger, selected action, and rejected options, then include Action: <action_name>.\n"
             "Respond with exactly one line in the form: Action: <action_name>"
         )
         return PromptArtifacts(
             system_prompt=(
-                "You are the CEO of a startup operating under uncertainty. "
-                "Choose the single best action for long-term company success by weighing runway hints, growth trend, recent events, crisis status, and the risk of repeating an action loop. "
-                "If the company is in crisis, avoid passive waiting unless there is truly no viable alternative. "
-                "Use the co-founder proposals as inputs, not commands."
+                "You are the CEO in a startup simulator. Choose one valid action "
+                "from co-founder proposals while balancing survival, recovery, and growth."
             ),
             user_prompt=user_prompt,
         )
